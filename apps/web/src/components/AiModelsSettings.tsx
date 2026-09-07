@@ -64,6 +64,14 @@ export default function AiModelsSettings({
   const [verified, setVerified] = useState<Set<string>>(loadVerified)
   const [busy, setBusy] = useState("")
   const [adding, setAdding] = useState(false)
+  // The engine only reflects a provider's stored key in /provider after its
+  // provider state is (re)built — which happens at engine start, not when a key
+  // is written. A key saved while the engine runs lands in auth.json at once and
+  // LLM calls pick it up live, but /provider keeps reporting the old state until
+  // a restart. `keyed` records providers whose key THIS page has written this
+  // session, so the "no key set" badge does not lie in that window.
+  const [keyed, setKeyed] = useState<Set<string>>(new Set())
+  const markKeyed = (id: string) => setKeyed((prev) => new Set(prev).add(id))
 
   async function load() {
     const [providers, auth, config] = await Promise.all([listProviders(client), listAuthMethods(client), getConfig()])
@@ -73,6 +81,10 @@ export default function AiModelsSettings({
     setCfg(config)
     setDisabled([...new Set(config.disabled_providers ?? [])])
   }
+
+  // A provider "has a key" when the engine reports one OR this session wrote one
+  // (the optimistic side of the staleness window above).
+  const hasKeyOf = (p: Provider | null) => (p ? providerHasKey(p) || keyed.has(p.id) : false)
 
   useEffect(() => {
     load()
@@ -114,6 +126,11 @@ export default function AiModelsSettings({
     try {
       await removeLocalProvider(id)
       toast("success", t("Removed {name}.", { name: nameOf(id) }))
+      setKeyed((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
       await load()
     } catch (error) {
       toast("error", error instanceof Error ? error.message : t("Could not remove provider."))
@@ -163,9 +180,11 @@ export default function AiModelsSettings({
             methods={methods}
             cfg={cfg}
             disabledList={disabled}
+            hasKey={hasKeyOf(cardFor(defaultPID))}
             onChangeModel={(pid, mid) => saveModels(`${pid}/${mid}`, fastModel)}
             onDelete={configuredOf(defaultPID) && !isGated(defaultPID) ? () => deleteConfigured(defaultPID) : undefined}
             onToggle={(on) => toggleEnabled(defaultPID, on)}
+            onKeySaved={markKeyed}
             onMutated={load}
             toast={toast}
           />
@@ -180,9 +199,11 @@ export default function AiModelsSettings({
             methods={methods}
             cfg={cfg}
             disabledList={disabled}
+            hasKey={hasKeyOf(cardFor(fastPID))}
             onChangeModel={(pid, mid) => saveModels(defaultModel, `${pid}/${mid}`)}
             onDelete={configuredOf(fastPID) && !isGated(fastPID) ? () => deleteConfigured(fastPID) : undefined}
             onToggle={(on) => toggleEnabled(fastPID, on)}
+            onKeySaved={markKeyed}
             onMutated={load}
             toast={toast}
           />
@@ -201,10 +222,12 @@ export default function AiModelsSettings({
                 cfg={cfg}
                 connected={connected}
                 methods={methods}
+                hasKey={hasKeyOf(p)}
                 onDefault={() => saveModels(`${p.id}/${firstModelID(p)}`, fastModel)}
                 onFast={() => saveModels(defaultModel, `${p.id}/${firstModelID(p)}`)}
                 onDelete={configuredOf(p.id) ? () => deleteConfigured(p.id) : undefined}
                 onToggle={(on) => toggleEnabled(p.id, on)}
+                onKeySaved={markKeyed}
                 onMutated={load}
                 toast={toast}
               />
@@ -225,10 +248,12 @@ export default function AiModelsSettings({
                 cfg={cfg}
                 connected={connected}
                 methods={methods}
+                hasKey={hasKeyOf(p)}
                 onDefault={undefined}
                 onFast={undefined}
                 onDelete={undefined}
                 onToggle={(on) => toggleEnabled(p.id, on)}
+                onKeySaved={markKeyed}
                 onMutated={load}
                 toast={toast}
                 off
@@ -241,6 +266,7 @@ export default function AiModelsSettings({
           {adding ? (
             <AddForm
               onCancel={() => setAdding(false)}
+              onKeySaved={markKeyed}
               onSaved={async () => {
                 setAdding(false)
                 await load()
@@ -287,10 +313,12 @@ function firstModelID(p: Provider) {
   return Object.keys(p.models ?? {})[0] ?? ""
 }
 
-// The engine flags whether a provider actually holds credentials in its `key`
-// field (the catalog "connected" list marks config presence, not a working key —
-// a configured provider with no key still lists as connected). The SDK type does
-// not model `key`, so read it through a narrow cast.
+// Whether the engine reports a stored credential for a provider. `/provider`
+// carries it in the optional `key` field of each entry (the SDK type does not
+// model it, so read it through a narrow cast). Note this is engine state from
+// startup: a key written while the engine runs is NOT reflected here until a
+// restart. The page layers its own optimistic `keyed` set on top — see
+// AiModelsSettings — so the badge stays truthful inside that window.
 export function providerHasKey(p: Provider) {
   return Boolean((p as unknown as { key?: string | Record<string, unknown> }).key)
 }
@@ -310,9 +338,11 @@ function SlotCard(props: {
   methods: Methods
   cfg: Config | null
   disabledList: string[]
+  hasKey: boolean
   onChangeModel: (providerID: string, modelID: string) => void
   onDelete?: () => void
   onToggle: (enable: boolean) => void
+  onKeySaved: (providerID: string) => void
   onMutated: () => void
   toast: ReturnType<typeof useToast>
 }) {
@@ -331,7 +361,7 @@ function SlotCard(props: {
   }
   const off = props.disabledList.includes(p.id)
   const modelID = props.modelSpec.split("/").slice(1).join("/")
-  const hasKey = providerHasKey(p)
+  const hasKey = props.hasKey
   const models = listModels(p, props.cfg)
   return (
     <div className={`settings-conn ai-models-slot${off ? " off" : ""}`}>
@@ -376,6 +406,7 @@ function SlotCard(props: {
           methods={props.methods}
           client={props.client}
           onSaved={() => props.onMutated()}
+          onKeySaved={() => props.onKeySaved(p.id)}
           toast={props.toast}
           title={t("Edit {name}", { name: p.name })}
         />
@@ -409,10 +440,12 @@ function PlainCard(props: {
   cfg: Config | null
   connected: Set<string>
   methods: Methods
+  hasKey: boolean
   onDefault?: () => void
   onFast?: () => void
   onDelete?: () => void
   onToggle: (enable: boolean) => void
+  onKeySaved: (providerID: string) => void
   onMutated: () => void
   toast: ReturnType<typeof useToast>
   off?: boolean
@@ -420,7 +453,7 @@ function PlainCard(props: {
   const { t } = useI18n()
   const p = props.provider
   const modelID = firstModelID(p)
-  const hasKey = providerHasKey(p)
+  const hasKey = props.hasKey
   return (
     <div className={`settings-conn ai-models-plain${props.off ? " off" : ""}`}>
       <div className="ai-models-card-main">
@@ -451,6 +484,7 @@ function PlainCard(props: {
           methods={props.methods}
           client={props.client}
           onSaved={() => props.onMutated()}
+          onKeySaved={() => props.onKeySaved(p.id)}
           toast={props.toast}
           title={t("Edit {name}", { name: p.name })}
         />
@@ -488,6 +522,7 @@ function EditButton(props: {
   methods: Methods
   client: Client
   onSaved: () => void
+  onKeySaved?: () => void
   toast: ReturnType<typeof useToast>
   title: string
 }) {
@@ -527,7 +562,10 @@ function EditButton(props: {
           modelID: modelID.trim() || models[0],
         })
       }
-      if (key.trim()) await setProviderKey(props.client, p.id, key.trim())
+      if (key.trim()) {
+        await setProviderKey(props.client, p.id, key.trim())
+        props.onKeySaved?.()
+      }
       props.onSaved()
       setOpen(false)
       props.toast("success", t("Saved {name}.", { name: p.name }))
@@ -637,7 +675,7 @@ function PasswordInput({
 // The inline "Add OpenAI-compatible model" form — four fields, matching the
 // unified card: name, base URL, API key, model id. Saving registers a configured
 // provider (addLocalProvider) and stores the key when one is given.
-function AddForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => void }) {
+function AddForm({ onCancel, onKeySaved, onSaved }: { onCancel: () => void; onKeySaved: (id: string) => void; onSaved: () => void }) {
   const { t } = useI18n()
   const [name, setName] = useState("")
   const [baseURL, setBaseURL] = useState("http://localhost:1234/v1")
@@ -652,7 +690,10 @@ function AddForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => v
     try {
       const client = settingsClient()
       await addLocalProvider({ id, name: name.trim(), baseURL: baseURL.trim(), modelID: modelID.trim() })
-      if (key.trim()) await setProviderKey(client, id, key.trim())
+      if (key.trim()) {
+        await setProviderKey(client, id, key.trim())
+        onKeySaved(id)
+      }
       onSaved()
     } finally {
       setSaving(false)

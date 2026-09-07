@@ -4,6 +4,8 @@
 
 > 2026-09-07 晚：① Settings 的 Models/Providers 两个 tab 合并为单页“AI model configuration”，含默认/Fast 槽卡、OpenAI 兼容服务商的添加与编辑表单、Vertex/Bedrock 主机凭据折叠区；② 新增 `updateLocalProvider` / `removeLocalProvider` / `removeProviderKey` 三个 API；截图见 `.workbuddy/artifacts/ai-models-settings-*.png`。
 
+> 2026-09-07 深夜（密钥徽标修复）：引擎的 provider 状态（`/provider` 返回的 `key` 字段、`connected` 列表）在**进程启动时构建一次并缓存**，运行中 `PUT /auth/{id}` 写入的 key 不会反映进去——密钥会立即生效（LLM 调用走实时 auth 读取），但 `/provider` 直到重启才更新，导致“已保存密钥仍显示未设置”。修复：① UI 层在 `AiModelsSettings` 记录本会话已写入 key 的 provider（乐观 `keyed` 集合，卡片 `hasKey = 引擎上报 key ∨ 本地已写`），保存后徽标即时翻转；② 本次已重启引擎刷新状态。后续引擎侧若想免重启，需在 auth 写入时使 provider `InstanceState` 失效（上游改动，暂未做）。
+
 > 2026-09-07 晚修订：项目已纳入 Git（远程 `git@github.com:BlueLeer/doc-haus-dochaus.git`，本地默认分支 `dev`，origin 已跟踪）。"无 .git、别假定可回滚"的旧表述作废，改动前无需手动快照；`.p0-backups/`、`.workbuddy/`、`.zed/` 已加入根 .gitignore，含凭据的备份不会误提交。接手步骤见第 11 节。
 
 这是**已实现状态、历史决策及工程风险记录**，不是新的实施授权。先读取用户最新请求，再决定工作范围。本文不含密钥或真实案件正文。状态依据本次代码检查和前几轮实际测试；不代表所有测试在本文生成时重新执行过。
