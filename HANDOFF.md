@@ -1,6 +1,8 @@
 # 模型接力文档：重庆劳动争议办案平台
 
-更新日期：2026-09-06（Asia/Shanghai）。本文供下一位开发模型直接接手。
+更新日期：2026-09-07（Asia/Shanghai）。本文供下一位开发模型直接接手。
+
+> 2026-09-07 晚：① Settings 的 Models/Providers 两个 tab 合并为单页“AI model configuration”，含默认/Fast 槽卡、OpenAI 兼容服务商的添加与编辑表单、Vertex/Bedrock 主机凭据折叠区；② 新增 `updateLocalProvider` / `removeLocalProvider` / `removeProviderKey` 三个 API；截图见 `.workbuddy/artifacts/ai-models-settings-*.png`。
 
 > 2026-09-07 晚修订：项目已纳入 Git（远程 `git@github.com:BlueLeer/doc-haus-dochaus.git`，本地默认分支 `dev`，origin 已跟踪）。"无 .git、别假定可回滚"的旧表述作废，改动前无需手动快照；`.p0-backups/`、`.workbuddy/`、`.zed/` 已加入根 .gitignore，含凭据的备份不会误提交。接手步骤见第 11 节。
 
