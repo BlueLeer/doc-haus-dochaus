@@ -1,0 +1,38 @@
+{
+  "id": "cn-labor-dispute",
+  "name": "中国劳动争议办案平台",
+  "defaultJurisdictions": [
+    "CN-CQ"
+  ],
+  "selectableJurisdictions": [
+    "CN-CQ"
+  ],
+  "jurisdictionRoots": [
+    "CN"
+  ],
+  "activeAgents": [
+    "labor",
+    "labor-drafter",
+    "labor-research",
+    "labor-reviewer",
+    "labor-review",
+    "router",
+    "agent-builder",
+    "skill-builder",
+    "template-builder",
+    "workflow-builder"
+  ],
+  "activeSkills": [
+    "matter-citation",
+    "labor-intake",
+    "labor-issues",
+    "labor-evidence",
+    "labor-procedure",
+    "labor-compensation",
+    "labor-local-rules",
+    "labor-drafting",
+    "redline-conventions"
+  ],
+  "activePlaybooks": [],
+  "rulesReady": false
+}

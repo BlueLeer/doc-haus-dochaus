@@ -1,0 +1,67 @@
+name: Bug report
+description: Report an issue that should be fixed
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the bug you encountered
+      placeholder: What happened?
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: doc.haus version
+      description: The commit you are running (`git rev-parse --short HEAD`)
+    validations:
+      required: false
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: If this is a UI issue, attach a screenshot
+      placeholder: Drag and drop screenshot here
+    validations:
+      required: false
+
+  - type: input
+    id: provider
+    attributes:
+      label: Model provider
+      description: Which provider/model were you using?
+      placeholder: e.g., Anthropic, Google Vertex, Ollama (local)
+    validations:
+      required: false
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      description: What OS are you using?
+      placeholder: e.g., macOS 26.0.1, Ubuntu 22.04, Windows 11
+    validations:
+      required: false
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      description: What browser are you using?
+      placeholder: e.g., Chrome 137, Safari 19, Firefox 140
+    validations:
+      required: false

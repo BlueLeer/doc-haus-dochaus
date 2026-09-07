@@ -1,0 +1,202 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "deepseek/deepseek-v4-flash",
+  "small_model": "deepseek/deepseek-v4-flash",
+  "plugin": [
+    "./plugin/legal.ts"
+  ],
+  "skills": {
+    "paths": [
+      "{env:WORKSPACE_ROOT}/.playbooks",
+      "{env:WORKSPACE_ROOT}/.skills"
+    ]
+  },
+  "instructions": [
+    "{env:WORKSPACE_ROOT}/.preferences/drafting.md"
+  ],
+  "disabled_providers": [
+    "opencode"
+  ],
+  "provider": {
+    "google-vertex": {
+      "npm": "@ai-sdk/google-vertex",
+      "name": "Google Vertex AI",
+      "models": {
+        "gemini-3.1-pro-preview": {
+          "name": "Gemini 3.1 Pro",
+          "family": "gemini",
+          "attachment": true,
+          "reasoning": true,
+          "temperature": true,
+          "tool_call": true,
+          "limit": {
+            "context": 1048576,
+            "output": 65536
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image",
+              "pdf"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "gemini-3.5-flash": {
+          "name": "Gemini 3.5 Flash",
+          "family": "gemini",
+          "attachment": true,
+          "reasoning": true,
+          "temperature": true,
+          "tool_call": true,
+          "limit": {
+            "context": 1048576,
+            "output": 65536
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image",
+              "pdf"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "mcp": {
+    "python": {
+      "type": "local",
+      "command": [
+        "sh",
+        "-c",
+        "cd \"$OPENCODE_CONFIG_DIR\" && exec deno run -N=cdn.jsdelivr.net,pypi.org,files.pythonhosted.org -R=node_modules -W=node_modules --node-modules-dir=auto jsr:@pydantic/mcp-run-python stdio"
+      ],
+      "timeout": 60000
+    }
+  },
+  "permission": {
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "task": "allow",
+    "skill": {
+      "*": "allow",
+      "citation-verification": "deny",
+      "cite-check": "deny",
+      "clause-library": "deny",
+      "contract-risk-checklist": "deny",
+      "drafting": "deny",
+      "employment-review": "deny",
+      "firm-profile": "deny",
+      "legal-research": "deny",
+      "missing-protections": "deny",
+      "privilege-review": "deny",
+      "playbook-dpa": "deny",
+      "playbook-engagement-letter": "deny",
+      "playbook-nda": "deny",
+      "playbook-saas-msa": "deny",
+      "playbook-services-agreement": "deny"
+    },
+    "search-document": "allow",
+    "cite": "allow",
+    "case-law": "deny",
+    "list-templates": "allow",
+    "get-template": "allow",
+    "update-template": "ask",
+    "delete-template": "ask",
+    "list-playbooks": "allow",
+    "update-playbook": "ask",
+    "delete-playbook": "ask",
+    "list-workflows": "allow",
+    "create-workflow": "ask",
+    "update-workflow": "ask",
+    "delete-workflow": "ask",
+    "list-skills": "allow",
+    "create-skill": "ask",
+    "update-skill": "ask",
+    "delete-skill": "ask",
+    "list-agents": "allow",
+    "create-agent": "ask",
+    "update-agent": "ask",
+    "delete-agent": "ask",
+    "read-document": "allow",
+    "python_run_python_code": "allow",
+    "courtlistener_*": "deny",
+    "draft-document": "ask",
+    "create-template": "ask",
+    "create-playbook": "ask",
+    "word-integration": "ask",
+    "tracked-changes": "ask",
+    "redline": "ask",
+    "redact": "ask",
+    "redaction-log": "allow",
+    "edit": "deny",
+    "bash": "deny",
+    "webfetch": "allow",
+    "web-search": "allow",
+    "websearch": "deny"
+  },
+  "agent": {
+    "explore": {
+      "disable": true
+    },
+    "general": {
+      "disable": true
+    },
+    "build": {
+      "disable": true
+    },
+    "plan": {
+      "disable": true
+    },
+    "assumption-challenger": {
+      "disable": true
+    },
+    "compare": {
+      "disable": true
+    },
+    "drafter": {
+      "disable": true
+    },
+    "extract": {
+      "disable": true
+    },
+    "legal-review": {
+      "disable": true
+    },
+    "legal-reviewer": {
+      "disable": true
+    },
+    "obligations": {
+      "disable": true
+    },
+    "playbook-importer": {
+      "disable": true
+    },
+    "playbook-reviewer": {
+      "disable": true
+    },
+    "qa": {
+      "disable": true
+    },
+    "redactor": {
+      "disable": true
+    },
+    "redliner": {
+      "disable": true
+    },
+    "research": {
+      "disable": true
+    },
+    "summarizer": {
+      "disable": true
+    }
+  }
+}
