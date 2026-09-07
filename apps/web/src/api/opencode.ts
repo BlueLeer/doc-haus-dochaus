@@ -102,6 +102,56 @@ export async function addLocalProvider(input: { id: string; name: string; baseUR
   })
 }
 
+// Update a locally-configured OpenAI-compatible provider (the same kind
+// addLocalProvider creates): rename it, move its baseURL, or swap the model id it
+// exposes. Read-merge-write of the whole provider map, like addLocalProvider, so
+// callers must not run concurrent saves. Only the given fields change. A model
+// rename does NOT re-point the engine's model/small_model: if the provider is the
+// default or fast model, the caller must follow up with setModels so the
+// "providerID/modelID" string still resolves.
+export async function updateLocalProvider(id: string, input: { name?: string; baseURL?: string; modelID?: string }) {
+  const cfg = await getConfig()
+  const existing = cfg.provider?.[id]
+  if (!existing) throw new Error(`没有找到本地配置的 provider: ${id}`)
+  const next: NonNullable<Config["provider"]>[string] = {
+    ...existing,
+    ...(input.name !== undefined ? { name: input.name } : {}),
+  }
+  if (input.baseURL !== undefined) {
+    next.options = { ...(next.options ?? {}), baseURL: input.baseURL }
+  }
+  if (input.modelID !== undefined) {
+    const [oldID] = Object.keys(existing.models ?? {})
+    const modelName = (oldID && existing.models?.[oldID]?.name) || oldID || input.modelID
+    next.models = { [input.modelID]: { name: modelName } }
+  }
+  return patchConfig({ provider: { ...(cfg.provider ?? {}), [id]: next } })
+}
+
+// Remove a locally-configured OpenAI-compatible provider from the engine config,
+// and drop any API key stored for it in the engine's auth store. Guarded: if the
+// provider is the engine's default or fast model, removal would leave a dangling
+// "providerID/modelID" pointer, so it refuses until the caller re-points
+// model/small_model elsewhere (the UI disables Delete under the same check).
+export async function removeLocalProvider(id: string) {
+  const cfg = await getConfig()
+  const providers = cfg.provider ?? {}
+  if (!providers[id]) throw new Error(`没有找到本地配置的 provider: ${id}`)
+  if (cfg.model?.startsWith(`${id}/`) || cfg.small_model?.startsWith(`${id}/`)) {
+    throw new Error(`“${id}” 正被设为默认或 Fast 模型，请先切换到其他模型再删除`)
+  }
+  const { [id]: _removed, ...rest } = providers
+  await patchConfig({ provider: rest })
+  await removeProviderKey(id).catch(() => {})
+}
+
+// Drop the engine's stored credentials for a provider (auth.json). Harmless when
+// none exist; used by removeLocalProvider to avoid leaving a dead key behind.
+export async function removeProviderKey(id: string) {
+  const res = await fetch(`${OPENCODE_URL}/auth/${encodeURIComponent(id)}`, { method: "DELETE" })
+  if (!res.ok && res.status !== 404) throw new Error(`Failed to remove credentials (${res.status})`)
+}
+
 // Vertex (project/location) and Bedrock (region/profile) take their settings from
 // provider.options in the engine's config, falling back to env only when unset
 // (see packages/opencode/src/provider/provider.ts). Setting them here means a

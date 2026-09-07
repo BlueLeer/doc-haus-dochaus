@@ -4095,3 +4095,159 @@ button.linklike:hover:not(:disabled) {
 .upload-status-error {
   color: var(--red, #b42318);
 }
+
+/* AI model configuration (Settings → the merged Models+Providers page). Cards
+   reuse .settings-conn; these add the slot layout, "in use" badges, the inline
+   add/edit forms, and the host-credential fold. */
+.ai-models {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai-models-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.ai-models-slot {
+  border-color: var(--accent-border);
+  background: var(--accent-tint);
+}
+
+.ai-models-slot.off {
+  background: var(--bg);
+  border-color: var(--border);
+}
+
+.ai-models-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ai-models-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-models-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  white-space: nowrap;
+}
+
+.ai-models-badge.off {
+  background: var(--border-strong);
+  color: var(--muted);
+}
+
+.ai-models-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.ai-models-dot {
+  opacity: 0.5;
+}
+
+.ai-models-nokey {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.ai-models-model-select {
+  font-size: 12.5px;
+  padding: 2px 6px;
+  max-width: 260px;
+  background: var(--panel);
+}
+
+.ai-models-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.ai-models-del {
+  color: var(--danger);
+}
+
+.ai-models-del:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.ai-models-empty {
+  font-size: 12px;
+}
+
+.ai-models-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+
+.ai-models-subhead {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ai-models-plain {
+  background: var(--panel);
+}
+
+.ai-models-add {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-models-addform {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  background: var(--bg-sunken);
+}
+
+.ai-models-editor {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.ai-models-cloudhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.ai-models-cloudbody {
+  margin-top: 8px;
+  padding-left: 2px;
+}
+
