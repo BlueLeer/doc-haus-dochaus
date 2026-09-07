@@ -6,11 +6,10 @@ import {
   listAuthMethods,
   listProviders,
   probeProvider,
-  setDefaultModel,
   setDisabledProviders,
+  setModels,
   setProviderKey,
   setProviderOptions,
-  setSmallModel,
   settingsClient,
   type Client,
 } from "../api/opencode"
@@ -94,7 +93,9 @@ export default function Settings({ onClose, firstRun = false }: { onClose: () =>
     setMethods(auth)
     setModel(cfg.model ?? "")
     setSmallModelValue(cfg.small_model ?? "")
-    setDisabled(cfg.disabled_providers ?? [])
+    const uniqueDisabled = [...new Set(cfg.disabled_providers ?? [])]
+    setDisabled(uniqueDisabled)
+    if (uniqueDisabled.length !== (cfg.disabled_providers ?? []).length) await setDisabledProviders(uniqueDisabled)
   }
 
   // Enable/disable a provider by editing config.disabled_providers. A disabled
@@ -105,7 +106,7 @@ export default function Settings({ onClose, firstRun = false }: { onClose: () =>
   // Remember names of providers we disable, since they vanish from `all`.
   const [nameMemo, setNameMemo] = useState<Record<string, string>>({})
   async function toggle(id: string, name: string, enable: boolean) {
-    const next = enable ? disabled.filter((x) => x !== id) : [...disabled, id]
+    const next = enable ? disabled.filter((x) => x !== id) : [...new Set([...disabled, id])]
     setDisabled(next)
     setConnected((prev) => {
       const n = new Set(prev)
@@ -126,7 +127,7 @@ export default function Settings({ onClose, firstRun = false }: { onClose: () =>
     setTab(next)
   }
 
-  const connectedProviders = all.filter((p) => connected.has(p.id))
+  const connectedProviders = all.filter((p) => connected.has(p.id) && !disabled.includes(p.id))
 
   // Vertex/Bedrock need a passing credential probe before they count as ready;
   // every other (API-key/OAuth) provider is ready the moment it's connected.
@@ -214,7 +215,7 @@ export default function Settings({ onClose, firstRun = false }: { onClose: () =>
 
   // Providers re-enabled this session won't be back in `all` until the engine
   // refreshes its catalog, so render them from the connected set directly.
-  const extraReady = [...connected].filter((id) => !all.some((p) => p.id === id))
+  const extraReady = [...connected].filter((id) => !disabled.includes(id) && !all.some((p) => p.id === id))
 
   // Providers you can connect with a typed API key. Any catalog provider is
   // keyable through auth.set, so we list the whole catalog (minus ones already
@@ -222,7 +223,7 @@ export default function Settings({ onClose, firstRun = false }: { onClose: () =>
   // plugin — otherwise OpenAI, Google AI Studio, and Anthropic-by-key would be
   // missing, since they ship no auth hook.
   const keyProviders = all
-    .filter((p) => !connected.has(p.id))
+    .filter((p) => !isGated(p.id) && !disabled.includes(p.id))
     .sort((a, b) => a.name.localeCompare(b.name))
 
   // Every model across connected providers, as the "providerID/modelID" strings
@@ -329,14 +330,19 @@ export default function Settings({ onClose, firstRun = false }: { onClose: () =>
                     className="primary"
                     disabled={!model}
                     onClick={async () => {
-                      // Save both slots together so the persisted config is always
-                      // same-provider — no window where default and fast disagree.
-                      await setDefaultModel(model)
-                      await setSmallModel(smallModel || model)
-                      // On first run, picking a model is the whole point of the modal —
-                      // close once it's saved so the user lands straight in the app.
-                      if (firstRun) return onClose()
-                      toast("success", t("Models saved."))
+                      try {
+                        const selected = models.find((item) => item.value === model)
+                        if (!selected) throw new Error("请选择有效模型")
+                        const probe = await probeProvider(client, selected.providerId, selected.modelId)
+                        if (!probe.ok) throw new Error(`模型验证失败：${probe.error || "提供商拒绝请求"}`)
+                        const saved = await setModels(model, smallModel || model)
+                        setModel(saved.model ?? model)
+                        setSmallModelValue(saved.small_model ?? (smallModel || model))
+                        if (firstRun) return onClose()
+                        toast("success", t("Models saved."))
+                      } catch (error) {
+                        toast("error", error instanceof Error ? error.message : "模型保存失败")
+                      }
                     }}
                   >
                     {t("Save")}
@@ -425,8 +431,8 @@ export default function Settings({ onClose, firstRun = false }: { onClose: () =>
                 )}
 
                 <section className="settings-section">
-                  <h3>{t("Add a provider — API key")}</h3>
-                  <p className="settings-hint muted">{t("A hosted provider you connect with an API key (OpenAI, Anthropic, Groq...). The key is stored on the engine. Vertex and Bedrock instead sign in on the server — see Needs setup above.")}</p>
+                  <h3>{t("Add or update a provider — API key")}</h3>
+                  <p className="settings-hint muted">{t("Connect a hosted provider or update credentials for an existing configured provider. The key is stored on the engine. Vertex and Bedrock instead sign in on the server — see Needs setup above.")}</p>
                   <div className="row settings-row">
                     <select value={pick} onChange={(e) => setPick(e.target.value)}>
                       <option value="">{t("Choose a provider")}</option>
@@ -892,6 +898,7 @@ function statusLabel(provider: Provider, methods: Methods) {
   const m = methods[provider.id] ?? []
   if (m.some((x) => x.type === "api")) return "API key"
   if (m.some((x) => x.type === "oauth")) return "Signed in"
+  if (!isGated(provider.id)) return "Configured"
   return "Host credentials"
 }
 

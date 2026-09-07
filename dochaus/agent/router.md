@@ -1,7 +1,6 @@
 ---
 description: Internal router that picks which assistant should answer a message. Never surfaced to users.
 mode: primary
-model: deepseek/deepseek-v4-flash
 temperature: 0
 tools:
   "*": false

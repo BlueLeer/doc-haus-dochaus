@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, symlinkSync, existsSync } from "nod
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { Document, Packer, Paragraph } from "docx"
-import { readCasebook, saveCasebook, addCaseAnalysis, type CaseRow } from "./casebook"
+import { readCasebook, saveCasebook, saveCaseSummary, addCaseAnalysis, type CaseRow } from "./casebook"
 import { extractDocumentText } from "./ingest"
 import { parseManualIntake } from "../../../dochaus/lib/manual-intake"
 
@@ -15,6 +15,62 @@ test("manual intake persists profiles and timeline without fabricated evidence",
   expect(result.rows.find((item) => item.field === "tenure")?.detail).toBe("5年")
   expect(result.rows.every((item) => !item.source && item.status === "pending" && item.gap.includes("用户手动补充"))).toBe(true)
   expect(readCasebook(dir).rows).toEqual(result.rows)
+})
+
+test("lawyer-confirmed summary is versioned and becomes stale after case rows change", async () => {
+  const dir = workspace()
+  const initial = await saveCasebook(dir, 0, [row()], extractDocumentText)
+  const draft = saveCaseSummary(dir, initial.revision, 0, "劳动者于2023年9月1日入职。", false)
+  expect(draft.summary?.confirmed).toHaveLength(0)
+  const confirmed = saveCaseSummary(dir, initial.revision, draft.summary!.updatedAt, "劳动者于2023年9月1日入职。", true)
+  expect(confirmed.summary?.confirmed[0]?.rowIds).toEqual(["fact-1"])
+  expect(confirmed.summary?.confirmed[0]?.revision).toBe(1)
+  expect(() => saveCaseSummary(dir, 1, draft.summary!.updatedAt, "另一页面的旧草稿", false)).toThrow("其他页面更新")
+  const changed = await saveCasebook(dir, 1, [row({ detail: "劳动者称2023年9月2日入职" })], extractDocumentText)
+  expect(changed.revision).toBe(2)
+  expect(changed.summary?.basedOnRevision).toBe(1)
+  expect(changed.summary?.confirmed).toHaveLength(1)
+})
+
+test("summary rejects stale revisions and invalid text", async () => {
+  const dir = workspace()
+  await saveCasebook(dir, 0, [row()], extractDocumentText)
+  expect(() => saveCaseSummary(dir, 0, 0, "有效摘要", true)).toThrow("案件已更新")
+  expect(() => saveCaseSummary(dir, 1, 0, "   ", true)).toThrow("不能为空")
+})
+
+test("confirming an edited summary atomically versions synchronized records", async () => {
+  const dir = workspace()
+  const initial = await saveCasebook(dir, 0, [row()], extractDocumentText)
+  const edited = [{ ...initial.rows[0]!, detail: "劳动者称2023年9月2日入职", date: "2023-09-02", status: "confirmed" as const }]
+  const result = saveCaseSummary(dir, 1, 0, "二、案件经过\n2023-09-02：劳动者称2023年9月2日入职", true, edited)
+  expect(result.revision).toBe(2)
+  expect(result.rows[0]?.modifiedInVersion).toBe(2)
+  expect(result.rows.every((item) => item.modifiedInVersion !== undefined)).toBe(true)
+  expect(result.summary?.basedOnRevision).toBe(2)
+  expect(result.summary?.confirmed[0]?.revision).toBe(2)
+})
+
+test("saving an edited summary draft also synchronizes records and versions them as pending", async () => {
+  const dir = workspace()
+  const initial = await saveCasebook(dir, 0, [row()], extractDocumentText)
+  const edited = [{ ...initial.rows[0]!, detail: "劳动者称2023年9月3日入职", date: "2023-09-03" }]
+  const result = saveCaseSummary(dir, 1, 0, "二、案件经过\n2023-09-03：劳动者称2023年9月3日入职", false, edited)
+  expect(result.revision).toBe(2)
+  expect(result.rows[0]?.detail).toContain("9月3日")
+  expect(result.rows[0]?.status).toBe("pending")
+  expect(result.rows[0]?.modifiedInVersion).toBe(2)
+  expect(result.summary?.confirmed).toHaveLength(0)
+})
+
+test("saving fills legacy content versions without advancing the case revision", async () => {
+  const dir = workspace()
+  const initial = await saveCasebook(dir, 0, [row()], extractDocumentText)
+  const legacy = { ...initial.rows[0]! }; delete legacy.modifiedInVersion
+  writeFileSync(path.join(dir, ".dochaus", "casebook.json"), JSON.stringify({ ...initial, rows: [legacy], staleSources: undefined }))
+  const result = saveCaseSummary(dir, 1, 0, "二、案件经过\n2023-09-01：劳动者称2023年9月1日入职", false, [legacy])
+  expect(result.revision).toBe(1)
+  expect(result.rows[0]?.modifiedInVersion).toBe(1)
 })
 
 const directories: string[] = []

@@ -44,8 +44,10 @@ export function parseRows(input: unknown, existingIds: string[] = []): CaseRow[]
       if (!source || typeof source.document !== "string" || !source.document || path.basename(source.document) !== source.document || source.document.startsWith(".") || !/\.(docx|pdf)$/i.test(source.document)) throw new CasebookError("来源必须是本案件中的 DOCX 或 PDF")
       if (typeof source.quote !== "string" || !source.quote.trim()) throw new CasebookError("来源引文不能为空")
     }
+    if (row.modifiedInVersion !== undefined && (!Number.isInteger(row.modifiedInVersion) || (row.modifiedInVersion as number) < 1)) throw new CasebookError("记录修改版本无效")
     return { id: row.id, kind: row.kind, field: row.field, title: row.title, date: row.date, detail: row.detail,
-      position: row.position, status: row.status, source: row.source, links: row.links, gap: row.gap } as CaseRow
+      position: row.position, status: row.status, source: row.source, links: row.links, gap: row.gap,
+      modifiedInVersion: row.modifiedInVersion as number | undefined } as CaseRow
   })
   if (rows.some((row) => row.links.some((id) => !ids.has(id) || id === row.id))) throw new CasebookError("关联记录不存在或指向自身")
   return rows
@@ -83,7 +85,10 @@ export async function saveCasebook(
   for (const [name, source] of verified) {
     if (!localSource(dir, name) || fingerprint(dir, name) !== source.hash) throw new CasebookError("核验过程中来源文档已变化，请重试", 409)
   }
-  const state: Casebook = { version: 1, revision: revision + 1, rows, analyses: latest.analyses }
+  const nextRevision = revision + 1
+  const versioned = rows.map((row) => ({ ...row, modifiedInVersion: JSON.stringify(current.rows.find((item) => item.id === row.id)) === JSON.stringify(row)
+    ? current.rows.find((item) => item.id === row.id)?.modifiedInVersion ?? revision : nextRevision }))
+  const state: Casebook = { version: 1, revision: nextRevision, rows: versioned, analyses: latest.analyses, summary: latest.summary }
   persist(dir, state)
   return readCasebook(dir)
 }
@@ -93,8 +98,34 @@ export function addCaseAnalysis(dir: string, revision: number, text: string) {
   if (current.revision !== revision) throw new CasebookError("分析所依据的案件版本已变化，请重新分析", 409)
   if (typeof text !== "string" || !text.trim() || text.length > 100000) throw new CasebookError("分析内容无效")
   if (current.staleSources.length) throw new CasebookError("有来源文档已变化，请先核验相关记录")
-  persist(dir, { version: 1, revision, rows: current.rows, analyses: [...current.analyses,
+  persist(dir, { version: 1, revision, rows: current.rows, summary: current.summary, analyses: [...current.analyses,
     { id: randomUUID(), text, revision, createdAt: Date.now() }] })
+  return readCasebook(dir)
+}
+
+export function saveCaseSummary(dir: string, revision: number, summaryUpdatedAt: number, text: string, confirm: boolean, inputRows?: unknown) {
+  const current = readCasebook(dir)
+  if (current.revision !== revision) throw new CasebookError("案件已更新，请先重新生成或核对案情摘要", 409)
+  if ((current.summary?.updatedAt ?? 0) !== summaryUpdatedAt) throw new CasebookError("案情摘要已在其他页面更新，请重新加载", 409)
+  if (typeof text !== "string") throw new CasebookError("案情摘要格式无效")
+  const value = text.trim()
+  if (!value || value.length > 100000) throw new CasebookError("案情摘要不能为空且不能超过10万字")
+  const parsed = inputRows !== undefined ? parseRows(inputRows) : current.rows
+  const changed = JSON.stringify(parsed) !== JSON.stringify(current.rows)
+  const needsVersioning = parsed.some((row) => row.modifiedInVersion === undefined)
+  const nextRevision = changed ? revision + 1 : revision
+  const rows = changed || needsVersioning ? parsed.map((row) => {
+    const previous = current.rows.find((item) => item.id === row.id)
+    const same = JSON.stringify(previous) === JSON.stringify(row)
+    return { ...row, status: same ? row.status : confirm ? "confirmed" as const : "pending" as const,
+      modifiedInVersion: same ? previous?.modifiedInVersion ?? revision : nextRevision }
+  }) : current.rows
+  const now = Math.max(Date.now(), (current.summary?.updatedAt ?? 0) + 1)
+  const confirmed = confirm ? [...(current.summary?.confirmed ?? []), {
+    id: randomUUID(), text: value, revision: nextRevision, rowIds: rows.map((row) => row.id), createdAt: now,
+  }] : current.summary?.confirmed ?? []
+  persist(dir, { version: 1, revision: nextRevision, rows, analyses: current.analyses,
+    summary: { draft: value, basedOnRevision: nextRevision, updatedAt: now, confirmed } })
   return readCasebook(dir)
 }
 

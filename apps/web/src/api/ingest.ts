@@ -17,6 +17,14 @@ export async function saveCasebook(id: string, revision: number, rows: CaseRow[]
   return result
 }
 
+export async function saveCaseSummary(id: string, revision: number, summaryUpdatedAt: number, text: string, confirm: boolean, rows?: CaseRow[]): Promise<CasebookView> {
+  const response = await fetch(`${INGEST_URL}/matters/${id}/casebook/summary`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revision, summaryUpdatedAt, text, confirm, rows }),
+  })
+  if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error ?? "保存案情摘要失败")
+  return response.json()
+}
+
 // Matters and documents live in the ingest service: it owns matter directories
 // under WORKSPACE_ROOT and turns uploaded DOCX into the per-matter embedding DB.
 // OpenCode has no upload endpoint, so all document I/O goes through here.

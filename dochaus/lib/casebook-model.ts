@@ -22,7 +22,10 @@ export type CaseRow = {
   source?: CaseSource
   links: string[]
   gap: string
+  modifiedInVersion?: number
 }
 export type CaseAnalysis = { id: string; text: string; revision: number; createdAt: number }
-export type Casebook = { version: 1; revision: number; rows: CaseRow[]; analyses: CaseAnalysis[] }
+export type CaseSummaryVersion = { id: string; text: string; revision: number; rowIds: string[]; createdAt: number }
+export type CaseSummary = { draft: string; basedOnRevision: number; updatedAt: number; confirmed: CaseSummaryVersion[] }
+export type Casebook = { version: 1; revision: number; rows: CaseRow[]; analyses: CaseAnalysis[]; summary?: CaseSummary }
 export type CasebookView = Casebook & { staleSources: string[] }

@@ -1,7 +1,7 @@
 import type { CaseRow } from "../api/ingest"
 import { CASE_FIELDS } from "../../../../dochaus/lib/casebook-model"
 
-export const recordFilters = { all: "全部", pending: "待确认", disputed: "存在争议", missing: "缺少来源", stale: "来源需复核" }
+export const recordFilters = { all: "全部", pending: "待纳入确认案情", disputed: "存在争议", missing: "缺少来源", stale: "来源需复核" }
 
 export function visibleRecords(rows: CaseRow[], kind: CaseRow["kind"], query: string, filter: keyof typeof recordFilters, stale: string[]) {
   return rows.filter((row) => row.kind === kind

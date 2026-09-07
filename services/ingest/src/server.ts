@@ -24,7 +24,7 @@ import { listAgents, createAgent, updateAgent, deleteAgent, setAgentEnabled, AGE
 import { docxodus } from "./docxodus"
 import { listGcpProjects, listAwsProfiles, probeVertex } from "./host"
 import { readGrid, writeGrid, type Grid } from "./grid"
-import { readCasebook, saveCasebook, addCaseAnalysis, CasebookError } from "./casebook"
+import { readCasebook, saveCasebook, saveCaseSummary, addCaseAnalysis, CasebookError } from "./casebook"
 import { readDraftingPreferences, writeDraftingPreferences } from "./preferences"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
@@ -89,6 +89,18 @@ app.post("/matters/:id/casebook", async (c) => {
     return c.json(await saveCasebook(dir, input.revision, input.rows, extractDocumentText, input.mode))
   } catch (error) {
     return c.json({ error: error instanceof Error ? error.message : "案件保存失败" }, error instanceof CasebookError ? error.status : 500)
+  }
+})
+
+app.post("/matters/:id/casebook/summary", async (c) => {
+  const dir = matterDir(c.req.param("id"))
+  if (!existsSync(path.join(dir, "matter.json"))) return c.json({ error: "案件不存在" }, 404)
+  const input = await c.req.json()
+  try {
+    return c.json(saveCaseSummary(dir, input.revision, input.summaryUpdatedAt, input.text, input.confirm === true, input.rows))
+  } catch (error) {
+    if (error instanceof CasebookError) return c.json({ error: error.message }, error.status)
+    throw error
   }
 })
 

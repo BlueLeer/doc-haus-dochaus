@@ -71,6 +71,13 @@ export async function setSmallModel(model: string) {
   return patchConfig({ small_model: model })
 }
 
+export async function setModels(model: string, smallModel: string) {
+  await patchConfig({ model, small_model: smallModel })
+  const saved = await getConfig()
+  if (saved.model !== model || saved.small_model !== smallModel) throw new Error("模型配置未生效，请检查运行中的引擎配置")
+  return saved
+}
+
 // Hide providers from routing entirely. A disabled provider drops out of the
 // catalog, the model picker, and any agent that would route to it.
 export async function setDisabledProviders(ids: string[]) {
@@ -211,9 +218,12 @@ export async function getMessages(client: Client, sessionID: string) {
 // Fire a prompt to a named agent. Resolves when the assistant turn completes;
 // live progress arrives separately through subscribeEvents.
 export async function sendPrompt(client: Client, sessionID: string, agent: string, text: string) {
+  const spec = (await getConfig()).model
+  const slash = spec?.indexOf("/") ?? -1
+  const model = spec && slash > 0 ? { providerID: spec.slice(0, slash), modelID: spec.slice(slash + 1) } : undefined
   return client.session.prompt({
     path: { id: sessionID },
-    body: { agent, parts: [{ type: "text", text }] },
+    body: { agent, model, parts: [{ type: "text", text }] },
   })
 }
 
